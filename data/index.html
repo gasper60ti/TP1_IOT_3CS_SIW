@@ -12,22 +12,24 @@
 
 <body>
     <div class="container" style="text-align:center;">
-        <p style="font-size:30px;">
+
+        <p style='font-size:30px;'>
             Led State:
-            <span id="state"></span>
+            <span id='state'></span>
         </p>
 
         <p>
-            <button class="btn btn-success"
-                onclick="state='ON'; spanL.innerHTML=state; var xhttpOn = new XMLHttpRequest(); xhttpOn.open('GET', 'LEDOn', true); xhttpOn.send();">ON</button>&nbsp;
-            <button class="btn btn-danger"
-                onclick="state='OFF'; spanL.innerHTML=state; var xhttpOff = new XMLHttpRequest(); xhttpOff.open('GET', 'LEDOff', true); xhttpOff.send();">OFF</button>
+            <button class="btn btn-success" onclick="sendWebSocketMessage('LED_ON')">ON</button>&nbsp;
+            <button class="btn btn-danger" onclick="sendWebSocketMessage('LED_OFF')">OFF</button>
         </p>
     </div>
 
-    <div style="text-align:center;"><br>Real Time Data Humidity, Temperature Logging with Graphs on ESP8266</div>
-    <div class="chart-container" style="height:350px; position:relative; width:100%">
-        <canvas id="Chart" width="400" height="400"></canvas>
+    <div style="text-align:center;">
+        <br>Real Time Data Humidity, Temperature Logging with Graphs on ESP8266
+    </div>
+
+    <div class="chart-container" style="height:350px; position: relative; width:100%">
+        <canvas height="400" id="Chart" width="400"></canvas>
     </div>
 
     <div>
@@ -47,7 +49,43 @@
         var spanL = document.getElementById("state");
         spanL.innerHTML = state;
 
-        // Graphs visit: https://www.chartjs.org
+        // Create WebSocket connection
+        var socket = new WebSocket('ws://' + window.location.hostname + ':81');
+
+        // WebSocket event listeners
+        socket.onopen = function (event) {
+            console.log("WebSocket connection established");
+        };
+
+        socket.onmessage = function (event) {
+            // Update LED state based on the message from the server
+            if (event.data === "LED is ON") {
+                state = "ON";
+            } else if (event.data === "LED is OFF") {
+                state = "OFF";
+            }
+            spanL.innerHTML = state;
+            console.log("Message from server: ", event.data);
+        };
+
+        socket.onclose = function (event) {
+            console.log("WebSocket connection closed");
+        };
+
+        socket.onerror = function (error) {
+            console.log("WebSocket error: ", error);
+        };
+
+        // Function to send WebSocket messages
+        function sendWebSocketMessage(message) {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+            } else {
+                console.log("WebSocket is not open");
+            }
+        }
+
+        // Graphs setup
         var Tvalues = [];
         var Hvalues = [];
         var timeStamp = [];
@@ -93,16 +131,15 @@
             });
         }
 
-        // On Page load show graphs
+        // On Page load, show graphs
         window.onload = function () {
             console.log(new Date().toLocaleTimeString());
         };
 
         setInterval(function () {
-            // Call a function repetitively with 5 Second interval
+            // Call a function repetitively with 5-second interval
             getData();
-        }, 5000); // 5000mSeconds update rate
-
+        }, 5000); // 5000 milliseconds update rate
         function getData() {
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
@@ -110,16 +147,15 @@
                     var time = new Date().toLocaleTimeString();
                     var txt = this.responseText;
                     var obj = JSON.parse(txt);
-
                     if (timeStamp.length >= 50) {
                         Tvalues.shift();
                         Hvalues.shift();
+                        timeStamp.shift();
                     }
-
                     Tvalues.push(obj.Temperature);
                     Hvalues.push(obj.Humidity);
                     timeStamp.push(time);
-                    showGraph();  // Update Graphs
+                    showGraph(); // Update Graphs
 
                     // Update Data Table
                     var table = document.getElementById("dataTable");
